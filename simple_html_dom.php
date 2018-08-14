@@ -31,7 +31,7 @@
  * Paperg - Added the forceTagsClosed to the dom constructor. Forcing tags closed is great for malformed html, but it
  * CAN lead to parsing errors. Allow the user to tell us how much they trust the html.
  *
- * Paperg add the text and plaintext to the selectors for the find syntax. Plaintext implies text in the innertext of
+ * Paperg add the text and plaintext to the selectors for the find syntax. Plaintext implies text in the innerText of
  * a node. Text implies that the tag is a text node. This allows for us to find tags based on the text they contain.
  * Create find_ancestor_tag to see if a tag is - at any level - inside of another specific tag.
  *
@@ -295,6 +295,7 @@ class simple_html_dom_node
 
     /**
      * Verify that node has children
+     *
      * @return bool
      */
     function hasChildNodes(): bool
@@ -431,7 +432,7 @@ class simple_html_dom_node
 
         $result = '';
         foreach ($this->nodes as $n) {
-            $result .= $n->outertext();
+            $result .= $n->outerText();
         }
         return $result;
     }
@@ -449,7 +450,7 @@ class simple_html_dom_node
                     $text = " with text: " . $this->text;
                 }
             }
-            $debugObject->debugLog(1, 'Innertext of tag: ' . $this->tag . $text);
+            $debugObject->debugLog(1, 'InnerText of tag: ' . $this->tag . $text);
         }
 
         if ($this->tag === 'root') {
@@ -484,7 +485,7 @@ class simple_html_dom_node
         } else {
             if ($this->nodes) {
                 foreach ($this->nodes as $n) {
-                    $result .= $this->convert_text($n->outertext());
+                    $result .= $this->convert_text($n->outerText());
                 }
             }
         }
@@ -903,7 +904,7 @@ class simple_html_dom_node
                 return $this->outerText();
             case 'innerText':
                 return $this->innerText();
-            case 'plainText':
+            case 'plaintext':
                 return $this->text();
             case 'XMLText':
                 return $this->XMLText();
@@ -932,16 +933,11 @@ class simple_html_dom_node
 
     function __isset($name)
     {
-        switch ($name) {
-            case 'outerText':
-                return true;
-            case 'innerText':
-                return true;
-            case 'plainText':
-                return true;
+        if (in_array($name, ['outerText', 'innerText', 'plaintext',])) {
+            return true;
         }
-        //no value attr: nowrap, checked selected...
-        return (array_key_exists($name, $this->attr)) ? true : isset($this->attr[$name]);
+
+        return array_key_exists($name, $this->attr);
     }
 
     function __unset($name)
@@ -1192,24 +1188,37 @@ class simple_html_dom_node
     public function removeNode($selector)
     {
         foreach ($this->find($selector) as $node) {
-            $node->outertext = '';
+            $node->outerText = '';
         }
         $this->dom->load($this->dom->save());
     }
 }
 
 /**
- * simple html dom parser
+ * Simple html dom parser.
+ *
  * Paperg - in the find routine: allow us to specify that we want case insensitive testing of the value of the selector.
  * Paperg - change $size from protected to public so we can easily access it
- * Paperg - added ForceTagsClosed in the constructor which tells us whether we trust the html or not.  Default is to NOT trust it.
- *
- * @package PlaceLocalInclude
+ * Paperg - added ForceTagsClosed in the constructor which tells us whether we trust the html or not. Default is
+ * to NOT trust it.
  */
 class simple_html_dom
 {
+    /**
+     * @var simple_html_dom_node
+     */
     public $root = null;
+
+    /**
+     * @var simple_html_dom_node[]
+     */
     public $nodes = [];
+
+    /**
+     * @var simple_html_dom_node
+     */
+    protected $parent;
+
     public $callback = null;
     public $lowercase = false;
     // Used to keep track of how large the text was when we started.
@@ -1219,7 +1228,6 @@ class simple_html_dom
     protected $doc;
     protected $char;
     protected $cursor;
-    protected $parent;
     protected $noise = [];
     protected $token_blank = " \t\r\n";
     protected $token_equal = ' =/>';
@@ -1228,11 +1236,11 @@ class simple_html_dom
     // Note that this is referenced by a child node, and so it needs to be public for that node to see this information.
     public $_charset = '';
     public $_target_charset = '';
-    protected $default_br_text = "";
-    public $default_span_text = "";
+    protected $default_br_text = '';
+    public $default_span_text = '';
 
     // use isset instead of in_array, performance boost about 30%...
-    protected $self_closing_tags = array(
+    protected $self_closing_tags = [
         'img'    => 1,
         'br'     => 1,
         'input'  => 1,
@@ -1242,24 +1250,37 @@ class simple_html_dom
         'base'   => 1,
         'embed'  => 1,
         'spacer' => 1,
-    );
-    protected $block_tags = array('root' => 1, 'body' => 1, 'form' => 1, 'div' => 1, 'span' => 1, 'table' => 1);
+    ];
+    protected $block_tags = ['root' => 1, 'body' => 1, 'form' => 1, 'div' => 1, 'span' => 1, 'table' => 1];
     // Known sourceforge issue #2977341
     // B tags that are not closed cause us to return everything to the end of the document.
-    protected $optional_closing_tags = array(
-        'tr'     => array('tr' => 1, 'td' => 1, 'th' => 1),
-        'th'     => array('th' => 1),
-        'td'     => array('td' => 1),
-        'li'     => array('li' => 1),
-        'dt'     => array('dt' => 1, 'dd' => 1),
-        'dd'     => array('dd' => 1, 'dt' => 1),
-        'dl'     => array('dd' => 1, 'dt' => 1),
-        'p'      => array('p' => 1),
-        'nobr'   => array('nobr' => 1),
-        'b'      => array('b' => 1),
-        'option' => array('option' => 1),
-    );
+    protected $optional_closing_tags = [
+        'tr'     => ['tr' => 1, 'td' => 1, 'th' => 1],
+        'th'     => ['th' => 1],
+        'td'     => ['td' => 1],
+        'li'     => ['li' => 1],
+        'dt'     => ['dt' => 1, 'dd' => 1],
+        'dd'     => ['dd' => 1, 'dt' => 1],
+        'dl'     => ['dd' => 1, 'dt' => 1],
+        'p'      => ['p' => 1],
+        'nobr'   => ['nobr' => 1],
+        'b'      => ['b' => 1],
+        'option' => ['option' => 1],
+    ];
 
+    /**
+     * Constructor.
+     *
+     * TODO add a normal description.
+     *
+     * @param null   $str
+     * @param bool   $lowercase
+     * @param bool   $forceTagsClosed
+     * @param string $target_charset
+     * @param bool   $stripRN
+     * @param string $defaultBRText
+     * @param string $defaultSpanText
+     */
     function __construct(
         $str = null,
         $lowercase = false,
@@ -1270,13 +1291,14 @@ class simple_html_dom
         $defaultSpanText = DEFAULT_SPAN_TEXT
     ) {
         if ($str) {
-            if (preg_match("/^http:\/\//i", $str) || is_file($str)) {
+            if (preg_match("/^http(s)?:\/\//i", $str) || is_file($str)) {
                 $this->load_file($str);
             } else {
                 $this->load($str, $lowercase, $stripRN, $defaultBRText, $defaultSpanText);
             }
         }
-        // Forcing tags to be closed implies that we don't trust the html, but it can lead to parsing errors if we SHOULD trust the html.
+        // Forcing tags to be closed implies that we don't trust the html, but it can lead to parsing errors
+        // if we SHOULD trust the html.
         if (!$forceTagsClosed) {
             $this->optional_closing_array = [];
         }
@@ -1288,7 +1310,16 @@ class simple_html_dom
         $this->clear();
     }
 
-    // load html from string
+    /**
+     * Load html from string.
+     *
+     * @param        $str
+     * @param bool   $lowercase
+     * @param bool   $stripRN
+     * @param string $defaultBRText
+     * @param string $defaultSpanText
+     * @return simple_html_dom
+     */
     function load(
         $str,
         $lowercase = false,
@@ -1296,8 +1327,6 @@ class simple_html_dom
         $defaultBRText = DEFAULT_BR_TEXT,
         $defaultSpanText = DEFAULT_SPAN_TEXT
     ) {
-        global $debugObject;
-
         // prepare
         $this->prepare($str, $lowercase, $stripRN, $defaultBRText, $defaultSpanText);
         // strip out comments
@@ -1332,59 +1361,86 @@ class simple_html_dom
 
     }
 
-    // load html from file
-    function load_file()
+    /**
+     * Load html from file.
+     *
+     * @return bool
+     */
+    function loadFile()
     {
         $args = func_get_args();
         $this->load(call_user_func_array('file_get_contents', $args), true);
         // Throw an error if we can't properly load the dom.
-        if (($error = error_get_last()) !== null) {
+        $error = error_get_last();
+        if (!is_null($error)) {
             $this->clear();
             return false;
         }
     }
 
-    // set callback function
-    function set_callback($function_name)
+    /**
+     * set callback function
+     *
+     * @param $functionName
+     */
+    function set_callback($functionName)
     {
-        $this->callback = $function_name;
+        $this->callback = $functionName;
     }
 
-    // remove callback function
+    /**
+     * remove callback function
+     */
     function remove_callback()
     {
         $this->callback = null;
     }
 
-    // save dom as string
-    function save($filepath = '')
+    /**
+     * save dom as string
+     *
+     * @param string $path
+     * @return mixed
+     */
+    function save($path = '')
     {
-        $result = $this->root->innertext();
-        if ($filepath !== '') {
-            file_put_contents($filepath, $result, LOCK_EX);
+        $result = $this->root->innerText();
+        if ($path !== '') {
+            file_put_contents($path, $result, LOCK_EX);
         }
         return $result;
     }
 
-    // find dom node by css selector
-    // Paperg - allow us to specify that we want case insensitive testing of the value of the selector.
+    /**
+     * Find dom node by css selector
+     *
+     * Paperg - allow us to specify that we want case insensitive testing of the value of the selector.
+     *
+     * @param      $selector
+     * @param null $idx
+     * @param bool $lowercase
+     * @return mixed
+     */
     function find($selector, $idx = null, $lowercase = false)
     {
         return $this->root->find($selector, $idx, $lowercase);
     }
 
-    // clean up memory due to php5 circular references memory leak...
+    /**
+     * Clean up memory due to php5 circular references memory leak.
+     */
     function clear()
     {
-        foreach ($this->nodes as $n) {
-            $n->clear();
-            $n = null;
+        foreach ($this->nodes as $node) {
+            $node->clear();
+            $node = null;
         }
-        // This add next line is documented in the sourceforge repository. 2977248 as a fix for ongoing memory leaks that occur even with the use of clear.
+        // This add next line is documented in the sourceforge repository. 2977248 as a fix for ongoing memory leaks
+        // that occur even with the use of clear.
         if (isset($this->children)) {
-            foreach ($this->children as $n) {
-                $n->clear();
-                $n = null;
+            foreach ($this->children as $node) {
+                $node->clear();
+                $node = null;
             }
         }
         if (isset($this->parent)) {
@@ -1404,7 +1460,15 @@ class simple_html_dom
         $this->root->dump($show_attr);
     }
 
-    // prepare HTML data and init everything
+    /**
+     * Prepare HTML data and init everything.
+     *
+     * @param        $str
+     * @param bool   $lowercase
+     * @param bool   $stripRN
+     * @param string $defaultBRText
+     * @param string $defaultSpanText
+     */
     protected function prepare(
         $str,
         $lowercase = false,
@@ -1421,8 +1485,7 @@ class simple_html_dom
 
         //before we save the string as the doc...  strip out the \r \n's if we are told to.
         if ($stripRN) {
-            $str = str_replace("\r", " ", $str);
-            $str = str_replace("\n", " ", $str);
+            $str = str_replace(["\r", "\n"], ' ', $str);
 
             // set the length of content since we have changed it.
             $this->size = strlen($str);
@@ -1446,7 +1509,9 @@ class simple_html_dom
         }
     }
 
-    // parse html content
+    /**
+     * Parse html content
+     */
     protected function parse()
     {
         if (($s = $this->copy_until_char('<')) === '') {
@@ -1461,12 +1526,16 @@ class simple_html_dom
         return true;
     }
 
-    // PAPERG - dkchou - added this to try to identify the character set of the page we have just parsed so we know better how to spit it out later.
-    // NOTE:  IF you provide a routine called get_last_retrieve_url_contents_content_type which returns the CURLINFO_CONTENT_TYPE from the last curl_exec
-    // (or the content_type header from the last transfer), we will parse THAT, and if a charset is specified, we will use it over any other mechanism.
+    /**
+     * PAPERG - dkchou - added this to try to identify the character set of the page we have just parsed so we know
+     * better how to spit it out later.
+     * NOTE: IF you provide a routine called `get_last_retrieve_url_contents_content_type()` which returns
+     * the CURLINFO_CONTENT_TYPE from the last `curl_exec()` (or the content_type header from the last transfer),
+     * we will parse THAT, and if a charset is specified, we will use it over any other mechanism.
+     */
     protected function parse_charset()
     {
-        global $debugObject;
+        global $debugObject; // FIXME
 
         $charset = null;
 
@@ -1479,7 +1548,6 @@ class simple_html_dom
                     $debugObject->debugLog(2, 'header content-type found charset of: ' . $charset);
                 }
             }
-
         }
 
         if (empty($charset)) {
@@ -1495,7 +1563,8 @@ class simple_html_dom
                     if ($success) {
                         $charset = $matches[1];
                     } else {
-                        // If there is a meta tag, and they don't specify the character set, research says that it's typically ISO-8859-1
+                        // If there is a meta tag, and they don't specify the character set, research says that
+                        // it's typically ISO-8859-1
                         if (is_object($debugObject)) {
                             $debugObject->debugLog(2,
                                 'meta content-type tag couldn\'t be parsed. using iso-8859 default.');
@@ -1506,7 +1575,7 @@ class simple_html_dom
             }
         }
 
-        // If we couldn't find a charset above, then lets try to detect one based on the text we got...
+        // If we couldn't find a charset above, then lets try to detect one based on the text we got.
         if (empty($charset)) {
             // Have php try to detect the encoding from the text given to us.
             $charset = mb_detect_encoding($this->root->plaintext . "ascii", $encoding_list = array("UTF-8", "CP1252"));
@@ -1514,7 +1583,8 @@ class simple_html_dom
                 $debugObject->debugLog(2, 'mb_detect found: ' . $charset);
             }
 
-            // and if this doesn't work...  then we need to just wrongheadedly assume it's UTF-8 so that we can move on - cause this will usually give us most of what we need...
+            // and if this doesn't work, then we need to just wrongheadedly assume it's UTF-8 so that we can move on -
+            // cause this will usually give us most of what we need.
             if ($charset === false) {
                 if (is_object($debugObject)) {
                     $debugObject->debugLog(2, 'since mb_detect failed - using default of utf-8');
@@ -1524,7 +1594,10 @@ class simple_html_dom
         }
 
         // Since CP1252 is a superset, if we get one of it's subsets, we want it instead.
-        if ((strtolower($charset) == strtolower('ISO-8859-1')) || (strtolower($charset) == strtolower('Latin1')) || (strtolower($charset) == strtolower('Latin-1'))) {
+        if ((strtolower($charset) == strtolower('ISO-8859-1'))
+            || (strtolower($charset) == strtolower('Latin1'))
+            || (strtolower($charset) == strtolower('Latin-1'))
+        ) {
             if (is_object($debugObject)) {
                 $debugObject->debugLog(2, 'replacing ' . $charset . ' with CP1252 as its a superset');
             }
@@ -1538,7 +1611,9 @@ class simple_html_dom
         return $this->_charset = $charset;
     }
 
-    // read tag info
+    /**
+     * Read tag info
+     */
     protected function read_tag()
     {
         if ($this->char !== '<') {
@@ -1574,7 +1649,7 @@ class simple_html_dom
                     }
 
                     if (strtolower($this->parent->tag) !== $tag_lower) {
-                        $this->parent = $org_parent; // restore origonal parent
+                        $this->parent = $org_parent; // restore original parent
                         if ($this->parent->parent) {
                             $this->parent = $this->parent->parent;
                         }
@@ -1590,7 +1665,7 @@ class simple_html_dom
                     }
 
                     if (strtolower($this->parent->tag) !== $tag_lower) {
-                        $this->parent = $org_parent; // restore origonal parent
+                        $this->parent = $org_parent; // restore original parent
                         $this->parent->_[HDOM_INFO_END] = $this->cursor;
                         return $this->as_text_node($tag);
                     }
@@ -1617,7 +1692,7 @@ class simple_html_dom
         $tag = $this->copy_until($this->token_slash);
         $node->tagStart = $begin_tag_pos;
 
-        // doctype, cdata & comments...
+        // doctype, cdata & comments
         if (isset($tag[0]) && $tag[0] === '!') {
             $node->_[HDOM_INFO_TEXT] = '<' . $tag . $this->copy_until_char('>');
 
@@ -1754,18 +1829,21 @@ class simple_html_dom
         // If it's a BR tag, we need to set it's text to the default text.
         // This way when we see it in plaintext, we can generate formatting that the user wants.
         // since a br tag never has sub nodes, this works well.
-        if ($node->tag == "br") {
+        if ($node->tag == 'br') {
             $node->_[HDOM_INFO_INNER] = $this->default_br_text;
         }
 
         return true;
     }
 
-    // parse attributes
+    /**
+     * Parse attributes
+     */
     protected function parse_attr($node, $name, &$space)
     {
         // Per sourceforge: http://sourceforge.net/tracker/?func=detail&aid=3061408&group_id=218559&atid=1044037
-        // If the attribute is already defined inside a tag, only pay atetntion to the first one as opposed to the last one.
+        // If the attribute is already defined inside a tag, only pay atetntion to the first one as opposed to
+        // the last one.
         if (isset($node->attr[$name])) {
             return;
         }
@@ -1778,7 +1856,7 @@ class simple_html_dom
                 $node->attr[$name] = $this->restore_noise($this->copy_until_char_escape('"'));
                 $this->char = (++$this->pos < $this->size) ? $this->doc[$this->pos] : null; // next
                 break;
-            case '\'':
+            case "'":
                 $node->_[HDOM_INFO_QUOTE][] = HDOM_QUOTE_SINGLE;
                 $this->char = (++$this->pos < $this->size) ? $this->doc[$this->pos] : null; // next
                 $node->attr[$name] = $this->restore_noise($this->copy_until_char_escape('\''));
@@ -1789,15 +1867,20 @@ class simple_html_dom
                 $node->attr[$name] = $this->restore_noise($this->copy_until($this->token_attr));
         }
         // PaperG: Attributes should not have \r or \n in them, that counts as html whitespace.
-        $node->attr[$name] = str_replace("\r", "", $node->attr[$name]);
-        $node->attr[$name] = str_replace("\n", "", $node->attr[$name]);
-        // PaperG: If this is a "class" selector, lets get rid of the preceeding and trailing space since some people leave it in the multi class case.
-        if ($name == "class") {
+        $node->attr[$name] = str_replace(["\r", "\n"], '', $node->attr[$name]);
+        // PaperG: If this is a "class" selector, lets get rid of the preceeding and trailing space since some people
+        // leave it in the multi class case.
+        if ($name == 'class') {
             $node->attr[$name] = trim($node->attr[$name]);
         }
     }
 
-    // link node's parent
+    /**
+     * Link node's parent
+     *
+     * @param $node
+     * @param $is_child
+     */
     protected function link_nodes(&$node, $is_child)
     {
         $node->parent = $this->parent;
@@ -1807,7 +1890,12 @@ class simple_html_dom
         }
     }
 
-    // as a text node
+    /**
+     * As a text node
+     *
+     * @param $tag
+     * @return bool
+     */
     protected function as_text_node($tag)
     {
         $node = new simple_html_dom_node($this);
@@ -1898,8 +1986,13 @@ class simple_html_dom
         }
     }
 
-    // remove noise from html content
-    // save the noise in the $this->noise array.
+    /**
+     * Remove noise from html content
+     * save the noise in the $this->noise array.
+     *
+     * @param      $pattern
+     * @param bool $remove_tag
+     */
     protected function remove_noise($pattern, $remove_tag = false)
     {
         global $debugObject;
@@ -1926,7 +2019,12 @@ class simple_html_dom
         }
     }
 
-    // restore noise to html content
+    /**
+     * Restore noise to html content
+     *
+     * @param $text
+     * @return string
+     */
     function restore_noise($text)
     {
         global $debugObject;
@@ -1935,9 +2033,12 @@ class simple_html_dom
         }
 
         while (($pos = strpos($text, '___noise___')) !== false) {
-            // Sometimes there is a broken piece of markup, and we don't GET the pos+11 etc... token which indicates a problem outside of us...
+            // Sometimes there is a broken piece of markup, and we don't GET the pos+11 etc. token which indicates
+            // a problem outside of us.
             if (strlen($text) > $pos + 15) {
-                $key = '___noise___' . $text[$pos + 11] . $text[$pos + 12] . $text[$pos + 13] . $text[$pos + 14] . $text[$pos + 15];
+                // TODO Replace with mb_substr(), but first need to cover this with test.
+                $key = '___noise___' . $text[$pos + 11] . $text[$pos + 12] . $text[$pos + 13] . $text[$pos + 14]
+                    . $text[$pos + 15];
                 if (is_object($debugObject)) {
                     $debugObject->debugLog(2, 'located key of: ' . $key);
                 }
@@ -1949,17 +2050,24 @@ class simple_html_dom
                     $text = substr($text, 0, $pos) . 'UNDEFINED NOISE FOR KEY: ' . $key . substr($text, $pos + 16);
                 }
             } else {
-                // There is no valid key being given back to us... We must get rid of the ___noise___ or we will have a problem.
+                // There is no valid key being given back to us. We must get rid of the ___noise___ or we'll have
+                // a problem.
                 $text = substr($text, 0, $pos) . 'NO NUMERIC NOISE KEY' . substr($text, $pos + 11);
             }
         }
         return $text;
     }
 
-    // Sometimes we NEED one of the noise elements.
+    /**
+     * Sometimes we NEED one of the noise elements.
+     *
+     * @param $text
+     * @return mixed
+     */
     function search_noise($text)
     {
-        global $debugObject;
+        global $debugObject; // FIXME
+
         if (is_object($debugObject)) {
             $debugObject->debugLogEntry(1);
         }
@@ -1973,16 +2081,16 @@ class simple_html_dom
 
     function __toString()
     {
-        return $this->root->innertext();
+        return $this->root->innerText();
     }
 
     function __get($name)
     {
         switch ($name) {
-            case 'outertext':
-                return $this->root->innertext();
-            case 'innertext':
-                return $this->root->innertext();
+            case 'outerText':
+                return $this->root->innerText();
+            case 'innerText':
+                return $this->root->innerText();
             case 'plaintext':
                 return $this->root->text();
             case 'charset':
@@ -1992,7 +2100,12 @@ class simple_html_dom
         }
     }
 
-    // camel naming conventions
+    /**
+     * Camel naming conventions.
+     *
+     * @param int $idx
+     * @return array|mixed|null
+     */
     function childNodes($idx = -1)
     {
         return $this->root->childNodes($idx);
@@ -2000,21 +2113,23 @@ class simple_html_dom
 
     function firstChild()
     {
-        return $this->root->first_child();
+        return $this->root->firstChild();
     }
 
     function lastChild()
     {
-        return $this->root->last_child();
+        return $this->root->lastChild();
     }
 
     function createElement($name, $value = null)
     {
-        return @str_get_html("<$name>$value</$name>")->first_child();
+        // TODO WTF?! Remove error muting, made a normal instance creation with errors tracking.
+        return @str_get_html("<$name>$value</$name>")->firstChild();
     }
 
     function createTextNode($value)
     {
+        // TODO Remove error muting, made a normal instance creation with errors tracking.
         return @end(str_get_html($value)->nodes);
     }
 
@@ -2038,19 +2153,12 @@ class simple_html_dom
         return $this->find($name, $idx);
     }
 
-    function loadFile()
-    {
-        $args = func_get_args();
-        $this->load_file($args);
-    }
-
     public function removeNode($selector)
     {
+        /** @var simple_html_dom_node $node  */
         foreach ($this->find($selector) as $node) {
-            $node->outertext = '';
+            $node->outerText = '';
         }
         $this->load($this->save());
     }
 }
-
-?>
