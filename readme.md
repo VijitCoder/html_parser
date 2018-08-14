@@ -2,9 +2,9 @@
 
 Делаю свой парсер на основе [PHP Simple HTML DOM Parser](https://sourceforge.net/projects/simplehtmldom/), ver 1.5, rev. 196.
 
-В \[/home/all/web_store/source/simple_html_dom.php] лежит слегка улучшенная версия.
-
 ## TODO
+
+Улучшать тут дохрена и больше.. Прошелся только по `simple_html_dom_node` и уже нашел кучу мест, с которыми нужно разобраться.
 
 - разобрать на классы. Парсер хороший, но исходники - говнокод.
 
@@ -17,6 +17,10 @@
 - В мануале есть страница FAQ, нужно создать решения под первые три вопроса. Эти решения должны быть из коробки.
 
 - Какой-то баг получился с "NO NUMERIC NOISE KEY 1004", см. [temp/_deleteConfirm.php]
+
+- см. комментарий в `simple_html_dom_node::parent()`. Что-то там не работает.
+
+- см. комментарий в `simple_html_dom_node::text()`. Там вопрос про что-то.
 
 ## Copyright
 
